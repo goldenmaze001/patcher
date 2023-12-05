@@ -1,19 +1,25 @@
 # patcher
 
-#### 介绍
+#### description
 
-admin 生成md5文件
+This is a desktop program based on Go and Fyne.
 
-patcher 更新程序
+step 1.
+the module `imetin2/patcher/admin` is used to generate the MD5 configuration file.
+Then you can upload the client files along with the configuration file to the web server.
 
-#### 构建方式
+step 2.
+the module `imetin2/patcher` is the pather program.
+You just need to configure the constant in main.go.
 
-go构建（不弹出命令行窗口）
+#### build
 
-go build  -ldflags -H=windowsgui main.go
+**go build without cli window**
 
-fyne构建（windows）
+`go build  -ldflags -H=windowsgui main.go`
 
-fyne package -os windows -icon metin2.ico
+**fyne build（windows）**
+
+`fyne package -os windows -icon metin2.ico`
 
 
