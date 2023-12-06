@@ -214,7 +214,6 @@ func main() {
 
 	// 状态栏
 	status := widget.NewLabel("")
-	// statusContainer := container.New(layout.NewCenterLayout(), status) // 文本居中
 
 	// 顶部菜单栏
 	homeFunc := func() {
@@ -272,16 +271,7 @@ func main() {
 		Importance: widget.SuccessImportance,
 		OnTapped: func() {
 			cmd := exec.Command("./Metin2Client.bin")
-
-			// 执行命令并等待它完成
-			// output, err := cmd.CombinedOutput()
-			// if err != nil {
-			// 	fyne.LogError("Error executing program", err)
-			// 	return
-			// }
-			// fmt.Println(string(output))
-
-			err := cmd.Start() // 启动程序，不等待它完成
+			err := cmd.Start()
 
 			if err != nil {
 				status.SetText(fmt.Sprintf("%s", err))
@@ -333,7 +323,3 @@ func main() {
 
 	myWindow.ShowAndRun()
 }
-
-// 效果一致
-// progressBar := container.NewHBox(progress, startBtn)
-// progressBar := container.New(layout.NewHBoxLayout(), progress, layout.NewSpacer(), startBtn)
