@@ -55,7 +55,6 @@ func getData() ([]FileInfo, int, error) {
 
 	// 检查响应状态码
 	if response.StatusCode != http.StatusOK {
-		fmt.Println("请求返回错误:", response.StatusCode)
 		return nil, 0, fmt.Errorf("请求返回错误：%d", response.StatusCode)
 	}
 
