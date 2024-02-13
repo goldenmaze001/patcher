@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
+	"time"
+
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
+
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,9 +19,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/theme"
 
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/getlantern/elevate"
@@ -29,15 +28,6 @@ import (
 
 const PATCH_URL = "http://patch.mt2.com/"
 const PATCH_CONFIG_URL = PATCH_URL + "patcher/config.ini"
-const WEB_URL = "http://localhost:8080/"
-const REGISTER_WEB_URL = WEB_URL + "register"
-const NEWS_WEB_URL = WEB_URL + "news/list"
-
-type News struct {
-	Title string
-	Time  string
-	Link  string
-}
 
 type FileInfo struct {
 	Name string
@@ -160,41 +150,6 @@ func downloadFile(name string) error {
 	return nil
 }
 
-func makeToolbarTab(_ fyne.Window, homeFunc func(), accountFunc func(), configFunc func()) fyne.CanvasObject {
-	t := widget.NewToolbar(
-		widget.NewToolbarAction(theme.HomeIcon(), homeFunc),
-		widget.NewToolbarAction(theme.AccountIcon(), accountFunc),
-		widget.NewToolbarSpacer(),
-		widget.NewToolbarAction(theme.SettingsIcon(), configFunc),
-	)
-
-	return container.NewBorder(t, nil, nil, nil)
-}
-
-func getNewsList() ([]News, error) {
-
-	response, err := http.Get(NEWS_WEB_URL)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var newsList []News
-	err = json.Unmarshal(body, &newsList)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return newsList, nil
-}
-
 func main() {
 
 	// 管理员打开
@@ -206,69 +161,24 @@ func main() {
 
 	myApp := app.New()
 	myWindow := myApp.NewWindow("更新程序")
-	// myWindow.Resize(fyne.NewSize(550, 0))
+	myWindow.SetFixedSize(true)
+	myWindow.Resize(fyne.NewSize(500, 80))
 	myWindow.CenterOnScreen()
-	// myWindow.SetFixedSize(true)
-	// myWindow.SetPadded(true)
+	myWindow.SetPadded(true)
 
 	// 状态栏
 	status := widget.NewLabel("")
-
-	// 顶部菜单栏
-	homeFunc := func() {
-		parsedURL, err := url.Parse(WEB_URL)
-		if err != nil {
-			status.SetText(fmt.Sprintf("%s", err))
-			return
-		}
-		app.New().OpenURL(parsedURL)
-	}
-	accountFunc := func() {
-		parsedURL, err := url.Parse(REGISTER_WEB_URL)
-		if err != nil {
-			status.SetText(fmt.Sprintf("%s", err))
-			return
-		}
-		app.New().OpenURL(parsedURL)
-	}
-	configFunc := func() {
-		cmd := exec.Command("./config.exe")
-		err := cmd.Start() // 启动程序，不等待它完成
-		if err != nil {
-			status.SetText(fmt.Sprintf("%s", err))
-		}
-	}
-	toolbarContainer := makeToolbarTab(myWindow, homeFunc, accountFunc, configFunc)
-
-	// 新闻
-	newsList, err := getNewsList()
-	if err != nil {
-		fyne.LogError("GET NEWS LIST:", err)
-		return
-	}
-
-	newsBar := container.NewVBox()
-	for _, news := range newsList {
-		link, err := url.Parse(WEB_URL + news.Link)
-		if err != nil {
-			fyne.LogError("Could not parse URL", err)
-			return
-		}
-		hyperlink := widget.NewHyperlink(news.Title + "     " + news.Time, link)
-		newsBar.Add(hyperlink)
-	}
-
-	newsCard := widget.NewCard("", "欢迎来到长安之角，新角色，新地图，新玩法。", newsBar)
+	status.Alignment = fyne.TextAlignCenter
 
 	// 进度条
 	progress := widget.NewProgressBar()
 	progress.SetValue(0)
 
-	// 启动按钮
-	startBtn := &widget.Button{
-		Text:       "启动",
-		Importance: widget.SuccessImportance,
-		OnTapped: func() {
+	// 布局
+	myWindow.SetContent(container.NewVBox(status, progress))
+
+	go func() {
+		start := func() {
 			cmd := exec.Command("./Metin2Client.bin")
 			err := cmd.Start()
 
@@ -277,46 +187,49 @@ func main() {
 			} else {
 				myApp.Quit()
 			}
-		},
-	}
+		}
 
-	startBtn.Disable()
-
-	// 布局
-	myWindow.SetContent(container.NewVBox(toolbarContainer, newsCard, layout.NewSpacer(), progress, status, startBtn))
-
-	go func() {
 		status.SetText("正在初始化...")
+
+		// 获取更新列表
 		data, totalSize, err := getData()
+		time.Sleep(2 * time.Second)
 
 		if err != nil {
 			status.SetText(fmt.Sprintf("%s", err))
 			return
 		}
 
+		// 已是最新版本
 		if totalSize == 0 {
 			status.SetText("更新完成")
 			progress.SetValue(1)
-			startBtn.Enable()
+			start()
 			return
 		}
 
+		// 开始下载
 		downloadSize := 0
 		for _, value := range data {
-			status.SetText("正在下载文件 " + value.Name)
+			status.SetText("下载 " + value.Name)
+
 			err = downloadFile(value.Name)
 			if err != nil {
 				status.SetText(fmt.Sprintf("%s", err))
 				return
 			}
+
+			// 更新进度
 			downloadSize += value.Size
 			progress.SetValue(float64(downloadSize) / float64(totalSize))
 		}
 
+		// 更新完成
 		if downloadSize == totalSize {
 			status.SetText("更新完成")
 			progress.SetValue(1)
-			startBtn.Enable()
+			start()
+			return
 		}
 	}()
 
